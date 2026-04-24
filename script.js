@@ -24,13 +24,15 @@ function spawnFood() {
     return newFood;
 }
 
-// create 10 foods
+// initialize 10 foods
 for (let i = 0; i < 10; i++) {
     foods.push(spawnFood());
 }
 
-// === PATHFINDING ===
+// === A* PATHFINDING ===
 function astar(start, goal, snake) {
+    if (!goal) return [];
+
     const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
     const key = (x,y)=>`${x},${y}`;
 
@@ -79,11 +81,14 @@ function astar(start, goal, snake) {
             }
         }
     }
+
     return [];
 }
 
 // === HELPERS ===
 function getClosestFood(head, foods) {
+    if (!foods.length) return null;
+
     let best = foods[0];
     let bestDist = Infinity;
 
@@ -150,7 +155,11 @@ function drawPath(path){
 
 // === GAME LOGIC ===
 function update() {
+    if (!foods.length) return;
+
     let target = getClosestFood(snake[0], foods);
+    if (!target) return;
+
     let path = astar(snake[0], target, snake);
 
     if (path.length > 1) {
@@ -175,9 +184,11 @@ function update() {
     }
 }
 
-// === DRAW (ONLY ONE!) ===
+// === DRAW ===
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if (!foods.length) return;
 
     let fullPath = buildFullPath(snake[0], foods, snake);
 
