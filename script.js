@@ -109,25 +109,23 @@ function update() {
     if (path.length > 1) {
         snake.unshift(path[1]);
     } else {
-        // fallback move
+        // fallback movement
         let h = snake[0];
         snake.unshift({x:(h.x+1)%gridSize, y:h.y});
     }
 
-    let ate = false;
-
-    foods = foods.filter(f => {
-        if (f.x === snake[0].x && f.y === snake[0].y) {
-            ate = true;
+    // === FOOD CHECK ===
+    for (let i = 0; i < foods.length; i++) {
+        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
+            foods.splice(i, 1);
             foods.push(spawnFood());
-            return false;
+            return; // grow (don't pop)
         }
-        return true;
-    });
+    }
 
-    if (!ate) snake.pop();
+    // normal move
+    snake.pop();
 }
-
 // === DRAW ===
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
