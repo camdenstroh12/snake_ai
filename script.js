@@ -98,12 +98,14 @@ function update(){
         snake.unshift(path[1]);
     }
 
-    if(snake[0].x===food.x && snake[0].y===food.y){
-        food = {
-            x: Math.floor(Math.random()*gridSize),
-            y: Math.floor(Math.random()*gridSize)
-        };
-    } else {
+   foods = foods.filter(f => {
+    if (f.x === snake[0].x && f.y === snake[0].y) {
+        foods.push(spawnFood()); // replace only the eaten one
+        return false; // remove eaten food
+    }
+    return true;
+}
+    ); else {
         snake.pop();
     }
 }
@@ -129,7 +131,7 @@ function draw(){
 let target = getClosestFood(snake[0], foods);
 let path = astar(snake[0], target, snake);
 
-    drawCell(food.x,food.y,"lime");
+    foods.forEach(f => drawCell(f.x, f.y, "lime"));
 
     snake.forEach(s=>drawCell(s.x,s.y,"white"));
 
