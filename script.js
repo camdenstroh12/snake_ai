@@ -111,7 +111,23 @@ function update(){
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    let path = astar(snake[0], food, snake);
+    function getClosestFood(head, foods) {
+    let best = foods[0];
+    let bestDist = Infinity;
+
+    foods.forEach(f => {
+        let d = Math.abs(head.x - f.x) + Math.abs(head.y - f.y);
+        if (d < bestDist) {
+            bestDist = d;
+            best = f;
+        }
+    });
+
+    return best;
+}
+
+let target = getClosestFood(snake[0], foods);
+let path = astar(snake[0], target, snake);
 
     drawCell(food.x,food.y,"lime");
 
