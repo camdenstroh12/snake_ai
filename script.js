@@ -1,4 +1,6 @@
-alert("JS IS RUNNING");
+window.onerror = function(message, source, lineno, colno, error) {
+    console.log("ERROR:", message);
+};
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -105,19 +107,23 @@ function getClosestFood(head, foods) {
 }
 
 function buildFullPath(head, foods, snake) {
+    if (!foods || foods.length === 0) return [];
+
     let remaining = [...foods];
     let current = head;
     let fullPath = [];
 
     while (remaining.length > 0) {
-        let closest = remaining.reduce((best, f) => {
+        let closest = remaining[0];
+
+        for (let f of remaining) {
             let d1 = Math.abs(current.x - f.x) + Math.abs(current.y - f.y);
-            let d2 = Math.abs(current.x - best.x) + Math.abs(current.y - best.y);
-            return d1 < d2 ? f : best;
-        });
+            let d2 = Math.abs(current.x - closest.x) + Math.abs(current.y - closest.y);
+            if (d1 < d2) closest = f;
+        }
 
         let segment = astar(current, closest, snake);
-        if (segment.length === 0) break;
+        if (!segment || segment.length === 0) break;
 
         if (fullPath.length > 0) segment.shift();
 
