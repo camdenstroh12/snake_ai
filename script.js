@@ -98,22 +98,58 @@ function getClosestFood(head, foods) {
     return best;
 }
 
-// === DRAW ===
-function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+function buildFullPath(head, foods, snake) {
+    let remaining = [...foods];
+    let current = head;
+    let fullPath = [];
 
-    let fullPath = buildFullPath(snake[0], foods, snake);
+    while (remaining.length > 0) {
+        let closest = remaining.reduce((best, f) => {
+            let d1 = Math.abs(current.x - f.x) + Math.abs(current.y - f.y);
+            let d2 = Math.abs(current.x - best.x) + Math.abs(current.y - best.y);
+            return d1 < d2 ? f : best;
+        });
 
-    foods.forEach(f => drawCell(f.x, f.y, "lime"));
-    snake.forEach(s => drawCell(s.x, s.y, "white"));
+        let segment = astar(current, closest, snake);
+        if (segment.length === 0) break;
 
-    drawPath(fullPath);
+        if (fullPath.length > 0) segment.shift();
+
+        fullPath = fullPath.concat(segment);
+        current = closest;
+
+        remaining = remaining.filter(f => f !== closest);
+    }
+
+    return fullPath;
+}
+
+// === DRAW HELPERS ===
+function drawCell(x,y,color){
+    ctx.fillStyle = color;
+    ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+}
+
+function drawPath(path){
+    if (!path.length) return;
+
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    path.forEach((p,i)=>{
+        let px = p.x*cellSize + cellSize/2;
+        let py = p.y*cellSize + cellSize/2;
+
+        if(i===0) ctx.moveTo(px,py);
+        else ctx.lineTo(px,py);
+    });
+
+    ctx.stroke();
 }
 
 // === GAME LOGIC ===
 function update() {
-    if (foods.length === 0) return;
-
     let target = getClosestFood(snake[0], foods);
     let path = astar(snake[0], target, snake);
 
@@ -139,51 +175,22 @@ function update() {
     }
 }
 
+// === DRAW (ONLY ONE!) ===
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    let target = getClosestFood(snake[0], foods);
-    let path = astar(snake[0], target, snake);
+    let fullPath = buildFullPath(snake[0], foods, snake);
 
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    drawPath(path);
+    drawPath(fullPath);
 }
 
 // === LOOP ===
 function loop(){
     update();
     draw();
-}
-function buildFullPath(head, foods, snake) {
-    let remaining = [...foods];
-    let current = head;
-    let fullPath = [];
-
-    while (remaining.length > 0) {
-        // find closest remaining food
-        let closest = remaining.reduce((best, f) => {
-            let d1 = Math.abs(current.x - f.x) + Math.abs(current.y - f.y);
-            let d2 = Math.abs(current.x - best.x) + Math.abs(current.y - best.y);
-            return d1 < d2 ? f : best;
-        });
-
-        let segment = astar(current, closest, snake);
-
-        if (segment.length === 0) break;
-
-        // avoid duplicating nodes
-        if (fullPath.length > 0) segment.shift();
-
-        fullPath = fullPath.concat(segment);
-        current = closest;
-
-        // remove that food
-        remaining = remaining.filter(f => f !== closest);
-    }
-
-    return fullPath;
 }
 
 setInterval(loop, 120);
