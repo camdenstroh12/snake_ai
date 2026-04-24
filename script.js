@@ -10,6 +10,7 @@ let history = [];
 let lastMove = {x: 1, y: 0};
 
 const FOOD_COUNT = 25;
+let stepsSinceFood = 0; // ✅ NEW (loop breaker)
 
 // === FOOD ===
 function spawnFood() {
@@ -35,6 +36,7 @@ function resetGame() {
     snake = [{x: 5, y: 5}];
     history = [];
     lastMove = {x: 1, y: 0};
+    stepsSinceFood = 0;
     initFoods();
 }
 
@@ -138,7 +140,6 @@ function simulateFuture(head, body, depth) {
         let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
 
         let score = -dist;
-
         score += simulateFuture(next, simBody, depth - 1) * 0.7;
 
         if (score > best) best = score;
@@ -175,7 +176,6 @@ function update() {
         let normalizedSpace = space / (gridSize * gridSize);
 
         let key = next.x + "," + next.y;
-
         let freq = history.filter(h => h === key).length;
         let loopPenalty = -freq * 40;
 
@@ -189,22 +189,26 @@ function update() {
 
         let safe = canReachTail(next, sim) ? 50 : -200;
 
-        // 🚫 EDGE PENALTY (fixes your issue)
         let edgePenalty =
             (next.x === 0 || next.y === 0 || next.x === gridSize-1 || next.y === gridSize-1)
             ? -25 : 0;
 
         let noise = Math.random() * 10;
 
+        // 🔥 LOOP BREAKER LOGIC
+        let hungerBoost = Math.min(stepsSinceFood * 0.5, 50);
+        let explorationBoost = stepsSinceFood > 40 ? 80 : 0;
+
         let score =
-            -dist * 3 +
-            normalizedSpace * 80 +
+            -(dist - hungerBoost) * 3 +
+            normalizedSpace * 70 +
             futureScore * 1.2 +
-            safe * 0.6 +
+            safe * 0.5 +
             momentumBonus +
             loopPenalty +
             reversePenalty +
             edgePenalty +
+            explorationBoost +
             noise;
 
         if (score > bestScore) {
@@ -246,8 +250,10 @@ function update() {
 
     if (ate) {
         foods.push(spawnFood());
+        stepsSinceFood = 0; // ✅ reset hunger
     } else {
         snake.pop();
+        stepsSinceFood++;
     }
 
     while (foods.length < FOOD_COUNT) {
@@ -274,5 +280,4 @@ function loop(){
     draw();
 }
 
-// 3x faster
 setInterval(loop, 33);
