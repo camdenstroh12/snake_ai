@@ -6,6 +6,8 @@ const cellSize = canvas.width / gridSize;
 
 let snake = [{x: 5, y: 5}];
 let foods = [];
+let history = [];
+let lastMove = {x: 1, y: 0};
 
 // === FOOD ===
 function spawnFood() {
@@ -24,53 +26,17 @@ function spawnFood() {
 
 function initFoods() {
     foods = [];
-    for (let i = 0; i < 10; i++) {
-        foods.push(spawnFood());
-    }
+    for (let i = 0; i < 10; i++) foods.push(spawnFood());
 }
 
 function resetGame() {
     snake = [{x: 5, y: 5}];
+    history = [];
+    lastMove = {x: 1, y: 0};
     initFoods();
 }
 
 initFoods();
-
-// === PATHFINDING ===
-function astar(start, goal, body) {
-    if (!goal) return [];
-
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    let queue = [{pos: start, path: [start]}];
-    let visited = new Set();
-
-    while (queue.length) {
-        let {pos, path} = queue.shift();
-        let key = pos.x + "," + pos.y;
-
-        if (visited.has(key)) continue;
-        visited.add(key);
-
-        if (pos.x === goal.x && pos.y === goal.y) {
-            return path;
-        }
-
-        for (let [dx,dy] of dirs) {
-            let nx = pos.x + dx;
-            let ny = pos.y + dy;
-
-            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
-            if (body.some(s => s.x === nx && s.y === ny)) continue;
-
-            queue.push({
-                pos: {x:nx,y:ny},
-                path: [...path, {x:nx,y:ny}]
-            });
-        }
-    }
-
-    return [];
-}
 
 // === HELPERS ===
 function getClosestFood(head) {
@@ -84,7 +50,6 @@ function getClosestFood(head) {
             best = f;
         }
     }
-
     return best;
 }
 
@@ -93,42 +58,35 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-// === SIMULATION ===
-function simulatePath(snake, path) {
-    let sim = [...snake];
+// === SPACE CHECK (THIS WAS MISSING)
+function getAvailableSpace(start, body) {
+    let visited = new Set();
+    let queue = [start];
 
-    for (let i = 1; i < path.length; i++) {
-        sim.unshift(path[i]);
-        sim.pop();
+    while (queue.length) {
+        let p = queue.shift();
+        let key = p.x + "," + p.y;
+
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+        for (let [dx,dy] of dirs) {
+            let nx = p.x + dx;
+            let ny = p.y + dy;
+
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
+            if (body.some(s => s.x === nx && s.y === ny)) continue;
+
+            queue.push({x:nx,y:ny});
+        }
     }
 
-    return sim;
+    return visited.size;
 }
 
-// === TAIL FOLLOW ===
-function getTailPath() {
-    let tail = snake[snake.length - 1];
-    return astar(snake[0], tail, snake);
-}
-
-// === SAFE MOVE ===
-function getSafeMove() {
-    const dirs = [
-        {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}
-    ];
-
-    for (let d of dirs) {
-        let next = {x: snake[0].x + d.x, y: snake[0].y + d.y};
-        if (!isCollision(next, snake)) return next;
-    }
-
-    return null;
-}
-
-// === UPDATE ===
-const history = [];
-let lastMove = {x: 1, y: 0}; // track direction
-
+// === UPDATE (SMART + NON-LOOPING)
 function update() {
     let head = snake[0];
 
@@ -145,37 +103,30 @@ function update() {
     for (let m of moves) {
         let next = {x: head.x + m.x, y: head.y + m.y};
 
-        // avoid collision
         if (isCollision(next, snake)) continue;
 
-        // simulate snake
         let sim = [next, ...snake.slice(0, -1)];
 
-        // closest food
         let food = getClosestFood(next);
         let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
 
-        // available space
         let space = getAvailableSpace(next, sim);
 
-        // === anti-loop ===
         let key = next.x + "," + next.y;
+
         let loopPenalty = history.includes(key) ? -100 : 0;
 
-        // === anti-backtracking ===
         let reversePenalty =
             (m.x === -lastMove.x && m.y === -lastMove.y) ? -200 : 0;
 
-        // === momentum bonus ===
         let momentumBonus =
             (m.x === lastMove.x && m.y === lastMove.y) ? 30 : 0;
 
-        // === controlled randomness ===
-        let noise = Math.random() * 20;
+        let noise = Math.random() * 15;
 
         let score =
-            -dist * 2 +     // go toward food
-            space * 0.6 +   // stay safe
+            -dist * 2 +
+            space * 0.6 +
             momentumBonus +
             loopPenalty +
             reversePenalty +
@@ -189,7 +140,6 @@ function update() {
         }
     }
 
-    // choose randomly among best moves (adds unpredictability)
     if (bestMoves.length === 0) {
         resetGame();
         return;
@@ -199,115 +149,16 @@ function update() {
     let nextMove = {x: head.x + chosen.x, y: head.y + chosen.y};
 
     lastMove = chosen;
-
     snake.unshift(nextMove);
 
-    // track history
     history.push(nextMove.x + "," + nextMove.y);
     if (history.length > 30) history.shift();
 
-    // collision check
     if (isCollision(snake[0], snake.slice(1))) {
         resetGame();
         return;
     }
 
-    // eating
-    let ate = false;
-
-    for (let i = 0; i < foods.length; i++) {
-        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
-            foods.splice(i, 1);
-            ate = true;
-            break;
-        }
-    }
-
-    if (ate) {
-        foods.push(spawnFood());
-    } else {
-        snake.pop();
-    }
-
-    while (foods.length < 10) {
-        foods.push(spawnFood());
-    }
-}
-        // skip collisions
-        if (isCollision(next, snake)) continue;
-
-        // simulate snake
-        let sim = [next, ...snake.slice(0, -1)];
-
-        // distance to closest food
-        let food = getClosestFood(next);
-        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
-
-        // available space after move
-        let space = getAvailableSpace(next, sim);
-
-        // loop penalty
-        let key = next.x + "," + next.y;
-        let loopPenalty = history.includes(key) ? -50 : 0;
-
-        // scoring formula
-        let score =
-            -dist * 2 +     // prefer closer food
-            space * 0.5 +   // prefer open space
-            loopPenalty;    // avoid repetition
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = next;
-        }
-    }
-
-    // no move → reset
-    if (!bestMove) {
-        resetGame();
-        return;
-    }
-
-    snake.unshift(bestMove);
-
-    // track history (limit size)
-    history.push(bestMove.x + "," + bestMove.y);
-    if (history.length > 20) history.shift();
-
-    // collision safety
-    if (isCollision(snake[0], snake.slice(1))) {
-        resetGame();
-        return;
-    }
-
-    // eating
-    let ate = false;
-
-    for (let i = 0; i < foods.length; i++) {
-        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
-            foods.splice(i, 1);
-            ate = true;
-            break;
-        }
-    }
-
-    if (ate) {
-        foods.push(spawnFood());
-    } else {
-        snake.pop();
-    }
-
-    while (foods.length < 10) {
-        foods.push(spawnFood());
-    }
-}
-
-    // collision check
-    if (isCollision(snake[0], snake.slice(1))) {
-        return resetGame();
-    }
-
-    // eating
     let ate = false;
 
     for (let i = 0; i < foods.length; i++) {
@@ -335,30 +186,11 @@ function drawCell(x,y,color){
     ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
 }
 
-function drawPath(path){
-    if (!path.length) return;
-
-    ctx.strokeStyle = "red";
-    ctx.beginPath();
-
-    path.forEach((p,i)=>{
-        let px = p.x*cellSize + cellSize/2;
-        let py = p.y*cellSize + cellSize/2;
-        if(i===0) ctx.moveTo(px,py);
-        else ctx.lineTo(px,py);
-    });
-
-    ctx.stroke();
-}
-
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
-
-    let path = astar(snake[0], getClosestFood(snake[0]), snake);
-    drawPath(path);
 }
 
 // === LOOP ===
