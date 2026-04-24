@@ -1,5 +1,7 @@
 window.onerror = function(message, source, lineno, colno, error) {
-    console.log("ERROR:", message);
+    console.log("GAME ERROR:", message);
+};
+
 };
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -10,6 +12,8 @@ const cellSize = canvas.width / gridSize;
 let snake = [{x: 5, y: 5}];
 let foods = [];
 
+ctx.fillStyle = "white";
+ctx.fillRect(50, 50, 50, 50);
 // === FOOD ===
 function spawnFood() {
     let newFood;
