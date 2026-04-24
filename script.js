@@ -126,34 +126,8 @@ function getSafeMove() {
 }
 
 // === UPDATE ===
-const history = []; // track recent positions
-
-function getAvailableSpace(start, body) {
-    let visited = new Set();
-    let queue = [start];
-
-    while (queue.length) {
-        let p = queue.shift();
-        let key = p.x + "," + p.y;
-
-        if (visited.has(key)) continue;
-        visited.add(key);
-
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-
-        for (let [dx,dy] of dirs) {
-            let nx = p.x + dx;
-            let ny = p.y + dy;
-
-            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
-            if (body.some(s => s.x === nx && s.y === ny)) continue;
-
-            queue.push({x:nx,y:ny});
-        }
-    }
-
-    return visited.size;
-}
+const history = [];
+let lastMove = {x: 1, y: 0}; // track direction
 
 function update() {
     let head = snake[0];
@@ -165,12 +139,100 @@ function update() {
         {x:0,y:-1}
     ];
 
-    let bestMove = null;
+    let bestMoves = [];
     let bestScore = -Infinity;
 
     for (let m of moves) {
         let next = {x: head.x + m.x, y: head.y + m.y};
 
+        // avoid collision
+        if (isCollision(next, snake)) continue;
+
+        // simulate snake
+        let sim = [next, ...snake.slice(0, -1)];
+
+        // closest food
+        let food = getClosestFood(next);
+        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
+
+        // available space
+        let space = getAvailableSpace(next, sim);
+
+        // === anti-loop ===
+        let key = next.x + "," + next.y;
+        let loopPenalty = history.includes(key) ? -100 : 0;
+
+        // === anti-backtracking ===
+        let reversePenalty =
+            (m.x === -lastMove.x && m.y === -lastMove.y) ? -200 : 0;
+
+        // === momentum bonus ===
+        let momentumBonus =
+            (m.x === lastMove.x && m.y === lastMove.y) ? 30 : 0;
+
+        // === controlled randomness ===
+        let noise = Math.random() * 20;
+
+        let score =
+            -dist * 2 +     // go toward food
+            space * 0.6 +   // stay safe
+            momentumBonus +
+            loopPenalty +
+            reversePenalty +
+            noise;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMoves = [m];
+        } else if (score === bestScore) {
+            bestMoves.push(m);
+        }
+    }
+
+    // choose randomly among best moves (adds unpredictability)
+    if (bestMoves.length === 0) {
+        resetGame();
+        return;
+    }
+
+    let chosen = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    let nextMove = {x: head.x + chosen.x, y: head.y + chosen.y};
+
+    lastMove = chosen;
+
+    snake.unshift(nextMove);
+
+    // track history
+    history.push(nextMove.x + "," + nextMove.y);
+    if (history.length > 30) history.shift();
+
+    // collision check
+    if (isCollision(snake[0], snake.slice(1))) {
+        resetGame();
+        return;
+    }
+
+    // eating
+    let ate = false;
+
+    for (let i = 0; i < foods.length; i++) {
+        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
+            foods.splice(i, 1);
+            ate = true;
+            break;
+        }
+    }
+
+    if (ate) {
+        foods.push(spawnFood());
+    } else {
+        snake.pop();
+    }
+
+    while (foods.length < 10) {
+        foods.push(spawnFood());
+    }
+}
         // skip collisions
         if (isCollision(next, snake)) continue;
 
