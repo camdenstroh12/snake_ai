@@ -22,12 +22,23 @@ function spawnFood() {
     return f;
 }
 
-// start with 10 foods
-for (let i = 0; i < 10; i++) {
-    foods.push(spawnFood());
+function initFoods() {
+    foods = [];
+    for (let i = 0; i < 10; i++) {
+        foods.push(spawnFood());
+    }
 }
 
-// === SIMPLE PATHFINDING (BFS) ===
+// === RESET ===
+function resetGame() {
+    snake = [{x: 5, y: 5}];
+    initFoods();
+}
+
+// initialize
+initFoods();
+
+// === PATHFINDING (BFS) ===
 function astar(start, goal) {
     if (!goal) return [];
 
@@ -81,6 +92,38 @@ function getClosestFood(head) {
     return best;
 }
 
+function isCollision(pos) {
+    // wall
+    if (pos.x < 0 || pos.y < 0 || pos.x >= gridSize || pos.y >= gridSize) {
+        return true;
+    }
+
+    // self
+    for (let i = 0; i < snake.length; i++) {
+        if (pos.x === snake[i].x && pos.y === snake[i].y) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getSafeMove(head) {
+    const dirs = [
+        {x:1,y:0},
+        {x:-1,y:0},
+        {x:0,y:1},
+        {x:0,y:-1}
+    ];
+
+    for (let d of dirs) {
+        let next = {x: head.x + d.x, y: head.y + d.y};
+        if (!isCollision(next)) return next;
+    }
+
+    return null;
+}
+
 // === DRAW ===
 function drawCell(x,y,color){
     ctx.fillStyle = color;
@@ -110,54 +153,62 @@ function update() {
     let target = getClosestFood(snake[0]);
     let path = astar(snake[0], target);
 
-    // move snake
+    let nextMove;
+
     if (path.length > 1) {
-        snake.unshift(path[1]);
+        nextMove = path[1];
+
+        // avoid death
+        if (isCollision(nextMove)) {
+            nextMove = getSafeMove(snake[0]);
+        }
     } else {
-        // fallback movement
-        let h = snake[0];
-        snake.unshift({x:(h.x+1)%gridSize, y:h.y});
+        nextMove = getSafeMove(snake[0]);
     }
 
-    let ateFood = false;
+    // no safe move → reset
+    if (!nextMove) {
+        resetGame();
+        return;
+    }
 
-    // check eating
+    snake.unshift(nextMove);
+
+    // collision after move → reset
+    if (isCollision(snake[0])) {
+        resetGame();
+        return;
+    }
+
+    let ate = false;
+
     for (let i = 0; i < foods.length; i++) {
-        if (
-            snake[0].x === foods[i].x &&
-            snake[0].y === foods[i].y
-        ) {
+        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
             foods.splice(i, 1);
-            ateFood = true;
+            ate = true;
             break;
         }
     }
 
-    // if ate → spawn new food
-    if (ateFood) {
+    if (ate) {
         foods.push(spawnFood());
     } else {
-        // normal movement
         snake.pop();
     }
 
-    // guarantee exactly 10 foods
+    // keep 10 foods
     while (foods.length < 10) {
         foods.push(spawnFood());
     }
 }
 
-// === RENDER ===
+// === DRAW FRAME ===
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // draw food
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
-
-    // draw snake
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    // draw path
     let target = getClosestFood(snake[0]);
     let path = astar(snake[0], target);
     drawPath(path);
