@@ -126,38 +126,119 @@ function getSafeMove() {
 }
 
 // === UPDATE ===
-function update() {
-    let target = getClosestFood(snake[0]);
+const history = []; // track recent positions
 
-    // 1️⃣ Try path to food
-    let foodPath = astar(snake[0], target, snake);
+function getAvailableSpace(start, body) {
+    let visited = new Set();
+    let queue = [start];
 
-    if (foodPath.length > 1) {
-        // simulate future snake
-        let simulated = simulatePath(snake, foodPath);
+    while (queue.length) {
+        let p = queue.shift();
+        let key = p.x + "," + p.y;
 
-        // check if tail still reachable
-        let tail = simulated[simulated.length - 1];
-        let safe = astar(simulated[0], tail, simulated);
+        if (visited.has(key)) continue;
+        visited.add(key);
 
-        if (safe.length > 0) {
-            snake.unshift(foodPath[1]);
-        } else {
-            // fallback: follow tail
-            let tailPath = getTailPath();
-            if (tailPath.length > 1) {
-                snake.unshift(tailPath[1]);
-            } else {
-                let move = getSafeMove();
-                if (!move) return resetGame();
-                snake.unshift(move);
-            }
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+        for (let [dx,dy] of dirs) {
+            let nx = p.x + dx;
+            let ny = p.y + dy;
+
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
+            if (body.some(s => s.x === nx && s.y === ny)) continue;
+
+            queue.push({x:nx,y:ny});
         }
-    } else {
-        let move = getSafeMove();
-        if (!move) return resetGame();
-        snake.unshift(move);
     }
+
+    return visited.size;
+}
+
+function update() {
+    let head = snake[0];
+
+    const moves = [
+        {x:1,y:0},
+        {x:-1,y:0},
+        {x:0,y:1},
+        {x:0,y:-1}
+    ];
+
+    let bestMove = null;
+    let bestScore = -Infinity;
+
+    for (let m of moves) {
+        let next = {x: head.x + m.x, y: head.y + m.y};
+
+        // skip collisions
+        if (isCollision(next, snake)) continue;
+
+        // simulate snake
+        let sim = [next, ...snake.slice(0, -1)];
+
+        // distance to closest food
+        let food = getClosestFood(next);
+        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
+
+        // available space after move
+        let space = getAvailableSpace(next, sim);
+
+        // loop penalty
+        let key = next.x + "," + next.y;
+        let loopPenalty = history.includes(key) ? -50 : 0;
+
+        // scoring formula
+        let score =
+            -dist * 2 +     // prefer closer food
+            space * 0.5 +   // prefer open space
+            loopPenalty;    // avoid repetition
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = next;
+        }
+    }
+
+    // no move → reset
+    if (!bestMove) {
+        resetGame();
+        return;
+    }
+
+    snake.unshift(bestMove);
+
+    // track history (limit size)
+    history.push(bestMove.x + "," + bestMove.y);
+    if (history.length > 20) history.shift();
+
+    // collision safety
+    if (isCollision(snake[0], snake.slice(1))) {
+        resetGame();
+        return;
+    }
+
+    // eating
+    let ate = false;
+
+    for (let i = 0; i < foods.length; i++) {
+        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
+            foods.splice(i, 1);
+            ate = true;
+            break;
+        }
+    }
+
+    if (ate) {
+        foods.push(spawnFood());
+    } else {
+        snake.pop();
+    }
+
+    while (foods.length < 10) {
+        foods.push(spawnFood());
+    }
+}
 
     // collision check
     if (isCollision(snake[0], snake.slice(1))) {
