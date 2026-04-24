@@ -268,4 +268,4 @@ function loop(){
 }
 
 // ✅ 3x faster (100 → 33 ms)
-setInterval(loop, 33);
+setInterval(loop, 10);
