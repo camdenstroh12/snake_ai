@@ -9,6 +9,8 @@ let foods = [];
 let history = [];
 let lastMove = {x: 1, y: 0};
 
+const FOOD_COUNT = 25; // ✅ increased from 10
+
 // === FOOD ===
 function spawnFood() {
     let f;
@@ -26,7 +28,7 @@ function spawnFood() {
 
 function initFoods() {
     foods = [];
-    for (let i = 0; i < 10; i++) foods.push(spawnFood());
+    for (let i = 0; i < FOOD_COUNT; i++) foods.push(spawnFood());
 }
 
 function resetGame() {
@@ -58,7 +60,7 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-// flood fill space check
+// flood fill
 function getAvailableSpace(start, body) {
     let visited = new Set();
     let queue = [start];
@@ -86,7 +88,7 @@ function getAvailableSpace(start, body) {
     return visited.size;
 }
 
-// === SAFETY: CAN REACH TAIL ===
+// === SAFETY ===
 function canReachTail(head, body) {
     let tail = body[body.length - 1];
     let visited = new Set();
@@ -109,7 +111,6 @@ function canReachTail(head, body) {
 
             if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
 
-            // allow tail (it moves)
             if (body.slice(0, -1).some(s => s.x === nx && s.y === ny)) continue;
 
             queue.push({x:nx,y:ny});
@@ -174,7 +175,6 @@ function update() {
 
         let key = next.x + "," + next.y;
 
-        // loop penalty (frequency-based)
         let freq = history.filter(h => h === key).length;
         let loopPenalty = -freq * 40;
 
@@ -243,7 +243,7 @@ function update() {
         snake.pop();
     }
 
-    while (foods.length < 10) {
+    while (foods.length < FOOD_COUNT) {
         foods.push(spawnFood());
     }
 }
@@ -267,4 +267,5 @@ function loop(){
     draw();
 }
 
-setInterval(loop, 100);
+// ✅ 3x faster (100 → 33 ms)
+setInterval(loop, 33);
