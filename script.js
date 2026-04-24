@@ -55,6 +55,8 @@ function astar(start, goal, snake) {
         open.sort((a,b)=>f[key(a.x,a.y)]-f[key(b.x,b.y)]);
         let current = open.shift();
 
+        if (!current) break;
+
         if (current.x===goal.x && current.y===goal.y) {
             let path=[current];
             let k=key(current.x,current.y);
@@ -91,7 +93,6 @@ function astar(start, goal, snake) {
 
     return [];
 }
-
 // === HELPERS ===
 function getClosestFood(head, foods) {
     if (!foods.length) return null;
