@@ -7,6 +7,7 @@ const cellSize = canvas.width / gridSize;
 let snake = [{x: 5, y: 5}];
 let foods = [];
 
+// === FOOD ===
 function spawnFood() {
     return {
         x: Math.floor(Math.random() * gridSize),
@@ -14,12 +15,12 @@ function spawnFood() {
     };
 }
 
-// create 10 foods initially
+// create 10 foods
 for (let i = 0; i < 10; i++) {
     foods.push(spawnFood());
 }
 
-// === A* PATHFINDING ===
+// === PATHFINDING ===
 function astar(start, goal, snake) {
     const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
     const key = (x,y)=>`${x},${y}`;
@@ -39,16 +40,19 @@ function astar(start, goal, snake) {
         if (current.x===goal.x && current.y===goal.y) {
             let path=[current];
             let k=key(current.x,current.y);
+
             while(cameFrom[k]){
                 current=cameFrom[k];
                 k=key(current.x,current.y);
                 path.push(current);
             }
+
             return path.reverse();
         }
 
         for (let [dx,dy] of dirs) {
             let nx=current.x+dx, ny=current.y+dy;
+
             if(nx<0||ny<0||nx>=gridSize||ny>=gridSize) continue;
             if(snake.some(s=>s.x===nx&&s.y===ny)) continue;
 
@@ -69,22 +73,7 @@ function astar(start, goal, snake) {
     return [];
 }
 
-// === DRAW ===
-function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    if (foods.length === 0) return;
-
-    let target = getClosestFood(snake[0], foods);
-    let path = astar(snake[0], target, snake);
-
-    foods.forEach(f => drawCell(f.x, f.y, "lime"));
-    snake.forEach(s => drawCell(s.x, s.y, "white"));
-
-    drawPath(path);
-}
-
-// === GAME LOOP ===
+// === HELPERS ===
 function getClosestFood(head, foods) {
     let best = foods[0];
     let bestDist = Infinity;
@@ -100,33 +89,75 @@ function getClosestFood(head, foods) {
     return best;
 }
 
+// === DRAW ===
+function drawCell(x,y,color){
+    ctx.fillStyle = color;
+    ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+}
+
+function drawPath(path){
+    if (!path.length) return;
+
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    path.forEach((p,i)=>{
+        let px = p.x*cellSize + cellSize/2;
+        let py = p.y*cellSize + cellSize/2;
+
+        if(i===0) ctx.moveTo(px,py);
+        else ctx.lineTo(px,py);
+    });
+
+    ctx.stroke();
+}
+
+// === GAME LOGIC ===
 function update() {
     if (foods.length === 0) return;
 
     let target = getClosestFood(snake[0], foods);
     let path = astar(snake[0], target, snake);
 
-    // move snake
     if (path.length > 1) {
         snake.unshift(path[1]);
     } else {
-        return; // no move possible
+        return;
     }
 
-    // check if food eaten
     let ate = false;
 
     foods = foods.filter(f => {
         if (f.x === snake[0].x && f.y === snake[0].y) {
             ate = true;
-            foods.push(spawnFood()); // replace eaten one
+            foods.push(spawnFood());
             return false;
         }
         return true;
     });
 
-    // only remove tail if we DIDN'T eat
     if (!ate) {
         snake.pop();
     }
 }
+
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    let target = getClosestFood(snake[0], foods);
+    let path = astar(snake[0], target, snake);
+
+    foods.forEach(f => drawCell(f.x, f.y, "lime"));
+    snake.forEach(s => drawCell(s.x, s.y, "white"));
+
+    drawPath(path);
+}
+
+// === LOOP ===
+function loop(){
+    update();
+    draw();
+}
+
+setInterval(loop, 120);
