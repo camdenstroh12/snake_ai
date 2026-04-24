@@ -173,10 +173,12 @@ function update() {
     let path = astar(snake[0], target, snake);
 
     if (path.length > 1) {
-        snake.unshift(path[1]);
-    } else {
-        return;
-    }
+    snake.unshift(path[1]);
+} else {
+    // fallback movement so game never freezes
+    let head = snake[0];
+    snake.unshift({x: (head.x + 1) % gridSize, y: head.y});
+}
 
     let ate = false;
 
@@ -198,16 +200,14 @@ function update() {
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    if (!foods.length) return;
-
-    let fullPath = buildFullPath(snake[0], foods, snake);
-
+    // ALWAYS draw snake + food first
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
+    // THEN try to draw path
+    let fullPath = buildFullPath(snake[0], foods, snake);
     drawPath(fullPath);
 }
-
 // === LOOP ===
 function loop(){
     update();
