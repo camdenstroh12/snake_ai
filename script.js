@@ -9,7 +9,7 @@ let foods = [];
 let history = [];
 let lastMove = {x: 1, y: 0};
 
-const FOOD_COUNT = 25; // ✅ increased from 10
+const FOOD_COUNT = 25;
 
 // === FOOD ===
 function spawnFood() {
@@ -60,7 +60,7 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-// flood fill
+// === SPACE CHECK ===
 function getAvailableSpace(start, body) {
     let visited = new Set();
     let queue = [start];
@@ -172,6 +172,7 @@ function update() {
         let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
 
         let space = getAvailableSpace(next, sim);
+        let normalizedSpace = space / (gridSize * gridSize);
 
         let key = next.x + "," + next.y;
 
@@ -188,16 +189,22 @@ function update() {
 
         let safe = canReachTail(next, sim) ? 50 : -200;
 
+        // 🚫 EDGE PENALTY (fixes your issue)
+        let edgePenalty =
+            (next.x === 0 || next.y === 0 || next.x === gridSize-1 || next.y === gridSize-1)
+            ? -25 : 0;
+
         let noise = Math.random() * 10;
 
         let score =
-            -dist * 2 +
-            space * 0.5 +
+            -dist * 3 +
+            normalizedSpace * 80 +
             futureScore * 1.2 +
-            safe +
+            safe * 0.6 +
             momentumBonus +
             loopPenalty +
             reversePenalty +
+            edgePenalty +
             noise;
 
         if (score > bestScore) {
@@ -267,5 +274,5 @@ function loop(){
     draw();
 }
 
-// ✅ 3x faster (100 → 33 ms)
-setInterval(loop, 10);
+// 3x faster
+setInterval(loop, 33);
