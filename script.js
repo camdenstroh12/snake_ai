@@ -5,7 +5,19 @@ const gridSize = 20;
 const cellSize = canvas.width / gridSize;
 
 let snake = [{x: 5, y: 5}];
-let food = {x: 10, y: 10};
+let foods = [];
+
+function spawnFood() {
+    return {
+        x: Math.floor(Math.random() * gridSize),
+        y: Math.floor(Math.random() * gridSize)
+    };
+}
+
+// create 10 foods initially
+for (let i = 0; i < 10; i++) {
+    foods.push(spawnFood());
+}
 
 // === A* PATHFINDING ===
 function astar(start, goal, snake) {
