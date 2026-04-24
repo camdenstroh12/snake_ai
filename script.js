@@ -9,10 +9,19 @@ let foods = [];
 
 // === FOOD ===
 function spawnFood() {
-    return {
-        x: Math.floor(Math.random() * gridSize),
-        y: Math.floor(Math.random() * gridSize)
-    };
+    let newFood;
+
+    do {
+        newFood = {
+            x: Math.floor(Math.random() * gridSize),
+            y: Math.floor(Math.random() * gridSize)
+        };
+    } while (
+        snake.some(s => s.x === newFood.x && s.y === newFood.y) ||
+        foods.some(f => f.x === newFood.x && f.y === newFood.y)
+    );
+
+    return newFood;
 }
 
 // create 10 foods
@@ -90,27 +99,15 @@ function getClosestFood(head, foods) {
 }
 
 // === DRAW ===
-function drawCell(x,y,color){
-    ctx.fillStyle = color;
-    ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
-}
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-function drawPath(path){
-    if (!path.length) return;
+    let fullPath = buildFullPath(snake[0], foods, snake);
 
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
+    foods.forEach(f => drawCell(f.x, f.y, "lime"));
+    snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    path.forEach((p,i)=>{
-        let px = p.x*cellSize + cellSize/2;
-        let py = p.y*cellSize + cellSize/2;
-
-        if(i===0) ctx.moveTo(px,py);
-        else ctx.lineTo(px,py);
-    });
-
-    ctx.stroke();
+    drawPath(fullPath);
 }
 
 // === GAME LOGIC ===
@@ -158,6 +155,35 @@ function draw() {
 function loop(){
     update();
     draw();
+}
+function buildFullPath(head, foods, snake) {
+    let remaining = [...foods];
+    let current = head;
+    let fullPath = [];
+
+    while (remaining.length > 0) {
+        // find closest remaining food
+        let closest = remaining.reduce((best, f) => {
+            let d1 = Math.abs(current.x - f.x) + Math.abs(current.y - f.y);
+            let d2 = Math.abs(current.x - best.x) + Math.abs(current.y - best.y);
+            return d1 < d2 ? f : best;
+        });
+
+        let segment = astar(current, closest, snake);
+
+        if (segment.length === 0) break;
+
+        // avoid duplicating nodes
+        if (fullPath.length > 0) segment.shift();
+
+        fullPath = fullPath.concat(segment);
+        current = closest;
+
+        // remove that food
+        remaining = remaining.filter(f => f !== closest);
+    }
+
+    return fullPath;
 }
 
 setInterval(loop, 120);
