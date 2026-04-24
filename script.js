@@ -70,50 +70,22 @@ function astar(start, goal, snake) {
 }
 
 // === DRAW ===
-function drawCell(x,y,color){
-    ctx.fillStyle=color;
-    ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
-}
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-function drawPath(path){
-    ctx.strokeStyle="red";
-    ctx.lineWidth=3;
-    ctx.beginPath();
+    if (foods.length === 0) return;
 
-    path.forEach((p,i)=>{
-        let px=p.x*cellSize+cellSize/2;
-        let py=p.y*cellSize+cellSize/2;
-        if(i===0) ctx.moveTo(px,py);
-        else ctx.lineTo(px,py);
-    });
+    let target = getClosestFood(snake[0], foods);
+    let path = astar(snake[0], target, snake);
 
-    ctx.stroke();
+    foods.forEach(f => drawCell(f.x, f.y, "lime"));
+    snake.forEach(s => drawCell(s.x, s.y, "white"));
+
+    drawPath(path);
 }
 
 // === GAME LOOP ===
-function update(){
-    let path = astar(snake[0], food, snake);
-
-    if(path.length > 1){
-        snake.unshift(path[1]);
-    }
-
-   foods = foods.filter(f => {
-    if (f.x === snake[0].x && f.y === snake[0].y) {
-        foods.push(spawnFood()); // replace only the eaten one
-        return false; // remove eaten food
-    }
-    return true;
-}
-    ); else {
-        snake.pop();
-    }
-}
-
-function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    function getClosestFood(head, foods) {
+function getClosestFood(head, foods) {
     let best = foods[0];
     let bestDist = Infinity;
 
@@ -128,19 +100,33 @@ function draw(){
     return best;
 }
 
-let target = getClosestFood(snake[0], foods);
-let path = astar(snake[0], target, snake);
+function update() {
+    if (foods.length === 0) return;
 
-    foods.forEach(f => drawCell(f.x, f.y, "lime"));
+    let target = getClosestFood(snake[0], foods);
+    let path = astar(snake[0], target, snake);
 
-    snake.forEach(s=>drawCell(s.x,s.y,"white"));
+    // move snake
+    if (path.length > 1) {
+        snake.unshift(path[1]);
+    } else {
+        return; // no move possible
+    }
 
-    drawPath(path);
+    // check if food eaten
+    let ate = false;
+
+    foods = foods.filter(f => {
+        if (f.x === snake[0].x && f.y === snake[0].y) {
+            ate = true;
+            foods.push(spawnFood()); // replace eaten one
+            return false;
+        }
+        return true;
+    });
+
+    // only remove tail if we DIDN'T eat
+    if (!ate) {
+        snake.pop();
+    }
 }
-
-function loop(){
-    update();
-    draw();
-}
-
-setInterval(loop,150);
