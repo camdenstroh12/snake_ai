@@ -58,7 +58,7 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-// === SPACE CHECK (THIS WAS MISSING)
+// flood fill space check
 function getAvailableSpace(start, body) {
     let visited = new Set();
     let queue = [start];
@@ -86,7 +86,67 @@ function getAvailableSpace(start, body) {
     return visited.size;
 }
 
-// === UPDATE (SMART + NON-LOOPING)
+// === SAFETY: CAN REACH TAIL ===
+function canReachTail(head, body) {
+    let tail = body[body.length - 1];
+    let visited = new Set();
+    let queue = [head];
+
+    while (queue.length) {
+        let p = queue.shift();
+        let key = p.x + "," + p.y;
+
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        if (p.x === tail.x && p.y === tail.y) return true;
+
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+        for (let [dx,dy] of dirs) {
+            let nx = p.x + dx;
+            let ny = p.y + dy;
+
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
+
+            // allow tail (it moves)
+            if (body.slice(0, -1).some(s => s.x === nx && s.y === ny)) continue;
+
+            queue.push({x:nx,y:ny});
+        }
+    }
+
+    return false;
+}
+
+// === LOOKAHEAD ===
+function simulateFuture(head, body, depth) {
+    if (depth === 0) return 0;
+
+    let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    let best = -Infinity;
+
+    for (let [dx,dy] of dirs) {
+        let next = {x: head.x + dx, y: head.y + dy};
+
+        if (isCollision(next, body)) continue;
+
+        let simBody = [next, ...body.slice(0, -1)];
+
+        let food = getClosestFood(next);
+        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
+
+        let score = -dist;
+
+        score += simulateFuture(next, simBody, depth - 1) * 0.7;
+
+        if (score > best) best = score;
+    }
+
+    return best === -Infinity ? -1000 : best;
+}
+
+// === UPDATE ===
 function update() {
     let head = snake[0];
 
@@ -114,19 +174,27 @@ function update() {
 
         let key = next.x + "," + next.y;
 
-        let loopPenalty = history.includes(key) ? -100 : 0;
+        // loop penalty (frequency-based)
+        let freq = history.filter(h => h === key).length;
+        let loopPenalty = -freq * 40;
 
         let reversePenalty =
-            (m.x === -lastMove.x && m.y === -lastMove.y) ? -200 : 0;
+            (m.x === -lastMove.x && m.y === -lastMove.y) ? -150 : 0;
 
         let momentumBonus =
-            (m.x === lastMove.x && m.y === lastMove.y) ? 30 : 0;
+            (m.x === lastMove.x && m.y === lastMove.y) ? 20 : 0;
 
-        let noise = Math.random() * 15;
+        let futureScore = simulateFuture(next, sim, 2);
+
+        let safe = canReachTail(next, sim) ? 50 : -200;
+
+        let noise = Math.random() * 10;
 
         let score =
             -dist * 2 +
-            space * 0.6 +
+            space * 0.5 +
+            futureScore * 1.2 +
+            safe +
             momentumBonus +
             loopPenalty +
             reversePenalty +
@@ -152,7 +220,7 @@ function update() {
     snake.unshift(nextMove);
 
     history.push(nextMove.x + "," + nextMove.y);
-    if (history.length > 30) history.shift();
+    if (history.length > 50) history.shift();
 
     if (isCollision(snake[0], snake.slice(1))) {
         resetGame();
