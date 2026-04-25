@@ -13,6 +13,10 @@ const FOOD_COUNT = 25;
 let stepsSinceFood = 0;
 const STARVE_LIMIT = 60;
 
+// 🟢 NEW
+let score = 0;
+let highScore = 0;
+
 // === FOOD ===
 function spawnFood() {
     let f;
@@ -34,6 +38,9 @@ function initFoods() {
 }
 
 function resetGame() {
+    highScore = Math.max(highScore, score); // 🟢 update high score
+    score = 0;
+
     snake = [{x: 5, y: 5}];
     lastMove = {x: 1, y: 0};
     stepsSinceFood = 0;
@@ -57,7 +64,7 @@ function getNeighbors(pos) {
     ];
 }
 
-// === BFS PATH ===
+// === BFS ===
 function bfs(start, targetCheck, body) {
     let queue = [[start]];
     let visited = new Set([start.x + "," + start.y]);
@@ -80,18 +87,15 @@ function bfs(start, targetCheck, body) {
     return null;
 }
 
-// === TAIL CHECK ===
 function canReachTail(head, body) {
     let tail = body[body.length - 1];
     return bfs(head, p => p.x === tail.x && p.y === tail.y, body.slice(0, -1));
 }
 
-// === FIND FOOD PATH ===
 function pathToFood(head, body) {
     return bfs(head, p => foods.some(f => f.x === p.x && f.y === p.y), body);
 }
 
-// === FIND TAIL PATH ===
 function pathToTail(head, body) {
     let tail = body[body.length - 1];
     return bfs(head, p => p.x === tail.x && p.y === tail.y, body.slice(0, -1));
@@ -108,7 +112,6 @@ function update() {
 
     let foodPath = pathToFood(head, snake);
 
-    // 🍎 TRY SAFE FOOD PATH
     if (foodPath && foodPath.length > 1) {
         let next = foodPath[1];
 
@@ -121,7 +124,6 @@ function update() {
         }
     }
 
-    // 🔁 FOLLOW TAIL
     let tailPath = pathToTail(head, snake);
 
     if (tailPath && tailPath.length > 1) {
@@ -129,7 +131,6 @@ function update() {
         return;
     }
 
-    // ⚠️ FALLBACK (random safe)
     let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
     if (neighbors.length > 0) {
@@ -160,6 +161,7 @@ function move(nextMove) {
     if (ate) {
         foods.push(spawnFood());
         stepsSinceFood = 0;
+        score++; // 🟢 increase score
     } else {
         snake.pop();
         stepsSinceFood++;
@@ -181,6 +183,12 @@ function draw() {
 
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
+
+    // 🟢 DRAW SCORE
+    ctx.fillStyle = "white";
+    ctx.font = "16px Arial";
+    ctx.fillText("Score: " + score, 10, 20);
+    ctx.fillText("High Score: " + highScore, 10, 40);
 }
 
 // === LOOP ===
