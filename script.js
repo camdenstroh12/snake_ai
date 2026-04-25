@@ -1,24 +1,20 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// 🎯 SETTINGS (CLEARLY SMALLER GRID)
-const gridSize = 10; // 👈 THIS is the key change
+// 🎯 SETTINGS
+const gridSize = 10;
 const cellSize = canvas.width / gridSize;
 
 const FOOD_COUNT = 4;
 const STARVE_LIMIT = 40;
 
-console.log("GRID SIZE:", gridSize); // 👈 debug check
-
-let snake = [{x: 5, y: 5}];
-let foods = [];
-let lastMove = {x: 1, y: 0};
-
-let stepsSinceFood = 0;
-
 // 🟢 SCORE
 let score = 0;
 let highScore = 0;
+
+let snake = [{x: 5, y: 5}];
+let foods = [];
+let stepsSinceFood = 0;
 
 // === FOOD ===
 function spawnFood() {
@@ -45,7 +41,6 @@ function resetGame() {
     score = 0;
 
     snake = [{x: 5, y: 5}];
-    lastMove = {x: 1, y: 0};
     stepsSinceFood = 0;
     initFoods();
 }
@@ -115,7 +110,6 @@ function update() {
 
     let foodPath = pathToFood(head, snake);
 
-    // 🍎 SAFE FOOD PATH
     if (foodPath && foodPath.length > 1) {
         let next = foodPath[1];
 
@@ -128,7 +122,6 @@ function update() {
         }
     }
 
-    // 🔁 FOLLOW TAIL
     let tailPath = pathToTail(head, snake);
 
     if (tailPath && tailPath.length > 1) {
@@ -136,7 +129,6 @@ function update() {
         return;
     }
 
-    // ⚠️ RANDOM SAFE
     let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
     if (neighbors.length > 0) {
@@ -147,11 +139,6 @@ function update() {
 }
 
 function move(nextMove) {
-    lastMove = {
-        x: nextMove.x - snake[0].x,
-        y: nextMove.y - snake[0].y
-    };
-
     snake.unshift(nextMove);
 
     let ate = false;
@@ -178,36 +165,31 @@ function move(nextMove) {
     }
 }
 
-// === DRAW ===
+// === DRAW CELL ===
 function drawCell(x,y,color){
     ctx.fillStyle = color;
     ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
 }
 
+// === DRAW ===
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // === DRAW FOOD ===
+    // FOOD
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
 
-    // === DRAW SNAKE ===
+    // SNAKE
     snake.forEach((s, i) => {
-
-        // 🟡 HEAD
-        if (// eyes
-ctx.fillStyle = "black";
-ctx.fillRect(s.x * cellSize + cellSize*0.2, s.y * cellSize + cellSize*0.2, 4, 4);
-ctx.fillRect(s.x * cellSize + cellSize*0.6, s.y * cellSize + cellSize*0.2, 4, 4);) {
-            ctx.fillStyle = "#FFD700"; // gold/yellow head
-        } 
-        // 🟢 BODY (gradient effect)
-        else {
-            let t = i / snake.length; // 0 → 1 along body
-            let shade = Math.floor(200 - t * 120); // darker toward tail
+        if (i === 0) {
+            // 🟡 HEAD
+            ctx.fillStyle = "#FFD700";
+        } else {
+            // 🟢 BODY GRADIENT
+            let t = i / snake.length;
+            let shade = Math.floor(200 - t * 120);
             ctx.fillStyle = `rgb(0, ${shade}, 0)`;
         }
 
-        // draw segment
         ctx.fillRect(
             s.x * cellSize,
             s.y * cellSize,
@@ -215,9 +197,8 @@ ctx.fillRect(s.x * cellSize + cellSize*0.6, s.y * cellSize + cellSize*0.2, 4, 4)
             cellSize
         );
 
-        // 🔲 optional outline for clarity
+        // outline
         ctx.strokeStyle = "black";
-        ctx.lineWidth = 1;
         ctx.strokeRect(
             s.x * cellSize,
             s.y * cellSize,
@@ -226,7 +207,7 @@ ctx.fillRect(s.x * cellSize + cellSize*0.6, s.y * cellSize + cellSize*0.2, 4, 4)
         );
     });
 
-    // === SCORE UI ===
+    // SCORE UI
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, 180, 60);
 
@@ -244,5 +225,4 @@ function loop(){
     draw();
 }
 
-// 🐢 slower speed
 setInterval(loop, 100);
