@@ -6,11 +6,13 @@ const cellSize = canvas.width / gridSize;
 
 let snake = [{x: 5, y: 5}];
 let foods = [];
-let history = [];
 let lastMove = {x: 1, y: 0};
 
 const FOOD_COUNT = 25;
+
+// ⏱ 2-second starvation timer (~33ms loop)
 let stepsSinceFood = 0;
+const STARVE_LIMIT = 60;
 
 // === FOOD ===
 function spawnFood() {
@@ -34,7 +36,6 @@ function initFoods() {
 
 function resetGame() {
     snake = [{x: 5, y: 5}];
-    history = [];
     lastMove = {x: 1, y: 0};
     stepsSinceFood = 0;
     initFoods();
@@ -43,21 +44,12 @@ function resetGame() {
 initFoods();
 
 // === HELPERS ===
-function getClosestFood(head) {
-    let best = foods[0];
-    let bestDist = Infinity;
-
-    for (let f of foods) {
-        let d = Math.abs(head.x - f.x) + Math.abs(head.y - f.y);
-        if (d < bestDist) {
-            bestDist = d;
-            best = f;
-        }
-    }
-    return best;
+function isCollision(pos, body) {
+    if (pos.x < 0 || pos.y < 0 || pos.x >= gridSize || pos.y >= gridSize) return true;
+    return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-function getAnyFoodDist(pos) {
+function getClosestFoodDist(pos) {
     let best = Infinity;
     for (let f of foods) {
         let d = Math.abs(pos.x - f.x) + Math.abs(pos.y - f.y);
@@ -66,42 +58,15 @@ function getAnyFoodDist(pos) {
     return best;
 }
 
-function isCollision(pos, body) {
-    if (pos.x < 0 || pos.y < 0 || pos.x >= gridSize || pos.y >= gridSize) return true;
-    return body.some(s => s.x === pos.x && s.y === pos.y);
-}
-
-// === SPACE ===
-function getAvailableSpace(start, body) {
-    let visited = new Set();
-    let queue = [start];
-
-    while (queue.length) {
-        let p = queue.shift();
-        let key = p.x + "," + p.y;
-
-        if (visited.has(key)) continue;
-        visited.add(key);
-
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-
-        for (let [dx,dy] of dirs) {
-            let nx = p.x + dx;
-            let ny = p.y + dy;
-
-            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
-            if (body.some(s => s.x === nx && s.y === ny)) continue;
-
-            queue.push({x:nx,y:ny});
-        }
-    }
-
-    return visited.size;
-}
-
 // === UPDATE ===
 function update() {
     let head = snake[0];
+
+    // ⏱ STARVATION CHECK
+    if (stepsSinceFood > STARVE_LIMIT) {
+        resetGame();
+        return;
+    }
 
     const moves = [
         {x:1,y:0},
@@ -118,48 +83,22 @@ function update() {
 
         if (isCollision(next, snake)) continue;
 
-        let sim = [next, ...snake.slice(0, -1)];
+        let dist = getClosestFoodDist(next);
 
-        let dist = getAnyFoodDist(next);
-        let space = getAvailableSpace(next, sim);
-        let normalizedSpace = space / (gridSize * gridSize);
+        // 🚀 AGGRESSIVE SCORING
+        let reversePenalty =
+            (m.x === -lastMove.x && m.y === -lastMove.y) ? -5 : 0;
 
-        let edgePenalty =
-            (next.x === 0 || next.y === 0 || next.x === gridSize-1 || next.y === gridSize-1)
-            ? -20 : 0;
+        let momentum =
+            (m.x === lastMove.x && m.y === lastMove.y) ? 2 : 0;
 
-        let freq = history.filter(h => h === next.x + "," + next.y).length;
-        let loopPenalty = -freq * 30;
+        let noise = Math.random() * 3;
 
-        let noise = Math.random() * 5;
-
-        // 🔥 AGGRESSION MODE
-        let aggressive = stepsSinceFood > 40;
-        let forceEat = stepsSinceFood > 80;
-
-        let score;
-
-        if (forceEat) {
-            // 🚨 FULL SEND MODE (ignore safety)
-            score = -dist * 10 + noise;
-        }
-        else if (aggressive) {
-            // ⚡ RISKY MODE
-            score =
-                -dist * 5 +
-                normalizedSpace * 20 +
-                loopPenalty +
-                noise;
-        }
-        else {
-            // 🧠 NORMAL MODE
-            score =
-                -dist * 3 +
-                normalizedSpace * 60 +
-                loopPenalty +
-                edgePenalty +
-                noise;
-        }
+        let score =
+            -dist * 10 +     // 🔥 VERY strong food priority
+            momentum +
+            reversePenalty +
+            noise;
 
         if (score > bestScore) {
             bestScore = score;
@@ -180,18 +119,10 @@ function update() {
     lastMove = chosen;
     snake.unshift(nextMove);
 
-    history.push(nextMove.x + "," + nextMove.y);
-    if (history.length > 50) history.shift();
-
-    if (isCollision(snake[0], snake.slice(1))) {
-        resetGame();
-        return;
-    }
-
     let ate = false;
 
     for (let i = 0; i < foods.length; i++) {
-        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
+        if (nextMove.x === foods[i].x && nextMove.y === foods[i].y) {
             foods.splice(i, 1);
             ate = true;
             break;
