@@ -8,7 +8,7 @@ let snake = [{x: 5, y: 5}];
 let foods = [];
 let lastMove = {x: 1, y: 0};
 
-const FOOD_COUNT = 25;
+const FOOD_COUNT = 10;
 
 let stepsSinceFood = 0;
 const STARVE_LIMIT = 60;
@@ -205,4 +205,4 @@ function loop(){
     draw();
 }
 
-setInterval(loop, 33);
+setInterval(loop, 100);
