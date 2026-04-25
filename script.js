@@ -57,48 +57,21 @@ function getClosestFood(head) {
     return best;
 }
 
+function getAnyFoodDist(pos) {
+    let best = Infinity;
+    for (let f of foods) {
+        let d = Math.abs(pos.x - f.x) + Math.abs(pos.y - f.y);
+        if (d < best) best = d;
+    }
+    return best;
+}
+
 function isCollision(pos, body) {
     if (pos.x < 0 || pos.y < 0 || pos.x >= gridSize || pos.y >= gridSize) return true;
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-// === BFS PATH TO FOOD (KEY ADDITION) ===
-function findPathToFood(start, body) {
-    let queue = [[start]];
-    let visited = new Set([start.x + "," + start.y]);
-
-    while (queue.length) {
-        let path = queue.shift();
-        let current = path[path.length - 1];
-
-        // check if food
-        if (foods.some(f => f.x === current.x && f.y === current.y)) {
-            return path;
-        }
-
-        let dirs = [
-            {x:1,y:0},
-            {x:-1,y:0},
-            {x:0,y:1},
-            {x:0,y:-1}
-        ];
-
-        for (let d of dirs) {
-            let next = {x: current.x + d.x, y: current.y + d.y};
-            let key = next.x + "," + next.y;
-
-            if (visited.has(key)) continue;
-            if (isCollision(next, body.slice(0, -1))) continue;
-
-            visited.add(key);
-            queue.push([...path, next]);
-        }
-    }
-
-    return null;
-}
-
-// === SPACE CHECK ===
+// === SPACE ===
 function getAvailableSpace(start, body) {
     let visited = new Set();
     let queue = [start];
@@ -130,37 +103,6 @@ function getAvailableSpace(start, body) {
 function update() {
     let head = snake[0];
 
-    // 🔥 LOOP BREAK MODE: force path to food
-    if (stepsSinceFood > 60) {
-        let path = findPathToFood(head, snake);
-        if (path && path.length > 1) {
-            let nextMove = path[1];
-
-            snake.unshift(nextMove);
-            lastMove = {x: nextMove.x - head.x, y: nextMove.y - head.y};
-
-            let ate = false;
-            for (let i = 0; i < foods.length; i++) {
-                if (nextMove.x === foods[i].x && nextMove.y === foods[i].y) {
-                    foods.splice(i, 1);
-                    ate = true;
-                    break;
-                }
-            }
-
-            if (ate) {
-                foods.push(spawnFood());
-                stepsSinceFood = 0;
-            } else {
-                snake.pop();
-                stepsSinceFood++;
-            }
-
-            return;
-        }
-    }
-
-    // === NORMAL AI (your improved version) ===
     const moves = [
         {x:1,y:0},
         {x:-1,y:0},
@@ -178,21 +120,46 @@ function update() {
 
         let sim = [next, ...snake.slice(0, -1)];
 
-        let food = getClosestFood(next);
-        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
-
+        let dist = getAnyFoodDist(next);
         let space = getAvailableSpace(next, sim);
         let normalizedSpace = space / (gridSize * gridSize);
 
         let edgePenalty =
             (next.x === 0 || next.y === 0 || next.x === gridSize-1 || next.y === gridSize-1)
-            ? -25 : 0;
+            ? -20 : 0;
 
-        let score =
-            -dist * 3 +
-            normalizedSpace * 80 +
-            edgePenalty +
-            Math.random() * 10;
+        let freq = history.filter(h => h === next.x + "," + next.y).length;
+        let loopPenalty = -freq * 30;
+
+        let noise = Math.random() * 5;
+
+        // 🔥 AGGRESSION MODE
+        let aggressive = stepsSinceFood > 40;
+        let forceEat = stepsSinceFood > 80;
+
+        let score;
+
+        if (forceEat) {
+            // 🚨 FULL SEND MODE (ignore safety)
+            score = -dist * 10 + noise;
+        }
+        else if (aggressive) {
+            // ⚡ RISKY MODE
+            score =
+                -dist * 5 +
+                normalizedSpace * 20 +
+                loopPenalty +
+                noise;
+        }
+        else {
+            // 🧠 NORMAL MODE
+            score =
+                -dist * 3 +
+                normalizedSpace * 60 +
+                loopPenalty +
+                edgePenalty +
+                noise;
+        }
 
         if (score > bestScore) {
             bestScore = score;
@@ -213,9 +180,18 @@ function update() {
     lastMove = chosen;
     snake.unshift(nextMove);
 
+    history.push(nextMove.x + "," + nextMove.y);
+    if (history.length > 50) history.shift();
+
+    if (isCollision(snake[0], snake.slice(1))) {
+        resetGame();
+        return;
+    }
+
     let ate = false;
+
     for (let i = 0; i < foods.length; i++) {
-        if (nextMove.x === foods[i].x && nextMove.y === foods[i].y) {
+        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
             foods.splice(i, 1);
             ate = true;
             break;
