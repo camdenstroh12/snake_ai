@@ -1,17 +1,18 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const gridSize = 20;
+// 🎯 BALANCED SETTINGS
+const gridSize = 10;
 const cellSize = canvas.width / gridSize;
+
+const FOOD_COUNT = 4;
+const STARVE_LIMIT = 40;
 
 let snake = [{x: 5, y: 5}];
 let foods = [];
 let lastMove = {x: 1, y: 0};
 
-const FOOD_COUNT = 10;
-
 let stepsSinceFood = 0;
-const STARVE_LIMIT = 60;
 
 // 🟢 SCORE
 let score = 0;
@@ -64,7 +65,7 @@ function getNeighbors(pos) {
     ];
 }
 
-// === BFS ===
+// === BFS PATHFINDING ===
 function bfs(start, targetCheck, body) {
     let queue = [[start]];
     let visited = new Set([start.x + "," + start.y]);
@@ -119,7 +120,7 @@ function update() {
         let sim = [next, ...snake];
         sim.pop();
 
-        if (canReachTail(next, sim) || stepsSinceFood > 40) {
+        if (canReachTail(next, sim) || stepsSinceFood > 20) {
             move(next);
             return;
         }
@@ -133,7 +134,7 @@ function update() {
         return;
     }
 
-    // ⚠️ RANDOM SAFE
+    // ⚠️ RANDOM SAFE MOVE
     let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
     if (neighbors.length > 0) {
@@ -164,7 +165,7 @@ function move(nextMove) {
     if (ate) {
         foods.push(spawnFood());
         stepsSinceFood = 0;
-        score++; // 🟢 SCORE++
+        score++;
     } else {
         snake.pop();
         stepsSinceFood++;
@@ -187,7 +188,7 @@ function draw() {
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    // 🟩 SCORE UI (guaranteed visible)
+    // 🟩 UI BOX
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, 180, 60);
 
@@ -205,4 +206,5 @@ function loop(){
     draw();
 }
 
+// 🐢 Slower speed
 setInterval(loop, 100);
