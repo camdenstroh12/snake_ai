@@ -13,7 +13,7 @@ const FOOD_COUNT = 25;
 let stepsSinceFood = 0;
 const STARVE_LIMIT = 60;
 
-// 🟢 NEW
+// 🟢 SCORE
 let score = 0;
 let highScore = 0;
 
@@ -38,7 +38,7 @@ function initFoods() {
 }
 
 function resetGame() {
-    highScore = Math.max(highScore, score); // 🟢 update high score
+    highScore = Math.max(highScore, score);
     score = 0;
 
     snake = [{x: 5, y: 5}];
@@ -112,6 +112,7 @@ function update() {
 
     let foodPath = pathToFood(head, snake);
 
+    // 🍎 SAFE FOOD PATH
     if (foodPath && foodPath.length > 1) {
         let next = foodPath[1];
 
@@ -124,6 +125,7 @@ function update() {
         }
     }
 
+    // 🔁 FOLLOW TAIL
     let tailPath = pathToTail(head, snake);
 
     if (tailPath && tailPath.length > 1) {
@@ -131,6 +133,7 @@ function update() {
         return;
     }
 
+    // ⚠️ RANDOM SAFE
     let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
     if (neighbors.length > 0) {
@@ -161,7 +164,7 @@ function move(nextMove) {
     if (ate) {
         foods.push(spawnFood());
         stepsSinceFood = 0;
-        score++; // 🟢 increase score
+        score++; // 🟢 SCORE++
     } else {
         snake.pop();
         stepsSinceFood++;
@@ -184,11 +187,16 @@ function draw() {
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    // 🟢 DRAW SCORE
+    // 🟩 SCORE UI (guaranteed visible)
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, 180, 60);
+
     ctx.fillStyle = "white";
-    ctx.font = "16px Arial";
-    ctx.fillText("Score: " + score, 10, 20);
-    ctx.fillText("High Score: " + highScore, 10, 40);
+    ctx.font = "bold 18px Arial";
+    ctx.textBaseline = "top";
+
+    ctx.fillText("Score: " + score, 10, 8);
+    ctx.fillText("High: " + highScore, 10, 30);
 }
 
 // === LOOP ===
