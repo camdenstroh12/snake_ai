@@ -1,12 +1,14 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// 🎯 BALANCED SETTINGS
-const gridSize = 10;
+// 🎯 SETTINGS (CLEARLY SMALLER GRID)
+const gridSize = 10; // 👈 THIS is the key change
 const cellSize = canvas.width / gridSize;
 
 const FOOD_COUNT = 4;
 const STARVE_LIMIT = 40;
+
+console.log("GRID SIZE:", gridSize); // 👈 debug check
 
 let snake = [{x: 5, y: 5}];
 let foods = [];
@@ -134,7 +136,7 @@ function update() {
         return;
     }
 
-    // ⚠️ RANDOM SAFE MOVE
+    // ⚠️ RANDOM SAFE
     let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
     if (neighbors.length > 0) {
@@ -188,7 +190,7 @@ function draw() {
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
     snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    // 🟩 UI BOX
+    // 🟩 SCORE UI
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, 180, 60);
 
@@ -206,5 +208,5 @@ function loop(){
     draw();
 }
 
-// 🐢 Slower speed
+// 🐢 slower speed
 setInterval(loop, 100);
