@@ -48,46 +48,53 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
-function getClosestFoodDist(pos) {
-    let best = Infinity;
-    for (let f of foods) {
-        let d = Math.abs(pos.x - f.x) + Math.abs(pos.y - f.y);
-        if (d < best) best = d;
-    }
-    return best;
+function getNeighbors(pos) {
+    return [
+        {x: pos.x+1, y: pos.y},
+        {x: pos.x-1, y: pos.y},
+        {x: pos.x, y: pos.y+1},
+        {x: pos.x, y: pos.y-1}
+    ];
 }
 
-// 🔥 CAN REACH TAIL CHECK
-function canReachTail(head, body) {
-    let tail = body[body.length - 1];
-    let visited = new Set();
-    let queue = [head];
+// === BFS PATH ===
+function bfs(start, targetCheck, body) {
+    let queue = [[start]];
+    let visited = new Set([start.x + "," + start.y]);
 
     while (queue.length) {
-        let p = queue.shift();
-        let key = p.x + "," + p.y;
+        let path = queue.shift();
+        let current = path[path.length - 1];
 
-        if (visited.has(key)) continue;
-        visited.add(key);
+        if (targetCheck(current)) return path;
 
-        if (p.x === tail.x && p.y === tail.y) return true;
+        for (let n of getNeighbors(current)) {
+            let key = n.x + "," + n.y;
+            if (visited.has(key)) continue;
+            if (isCollision(n, body)) continue;
 
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-
-        for (let [dx,dy] of dirs) {
-            let nx = p.x + dx;
-            let ny = p.y + dy;
-
-            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
-
-            // allow tail (it moves)
-            if (body.slice(0, -1).some(s => s.x === nx && s.y === ny)) continue;
-
-            queue.push({x:nx,y:ny});
+            visited.add(key);
+            queue.push([...path, n]);
         }
     }
+    return null;
+}
 
-    return false;
+// === TAIL CHECK ===
+function canReachTail(head, body) {
+    let tail = body[body.length - 1];
+    return bfs(head, p => p.x === tail.x && p.y === tail.y, body.slice(0, -1));
+}
+
+// === FIND FOOD PATH ===
+function pathToFood(head, body) {
+    return bfs(head, p => foods.some(f => f.x === p.x && f.y === p.y), body);
+}
+
+// === FIND TAIL PATH ===
+function pathToTail(head, body) {
+    let tail = body[body.length - 1];
+    return bfs(head, p => p.x === tail.x && p.y === tail.y, body.slice(0, -1));
 }
 
 // === UPDATE ===
@@ -99,60 +106,45 @@ function update() {
         return;
     }
 
-    const moves = [
-        {x:1,y:0},
-        {x:-1,y:0},
-        {x:0,y:1},
-        {x:0,y:-1}
-    ];
+    let foodPath = pathToFood(head, snake);
 
-    let bestMoves = [];
-    let bestScore = -Infinity;
+    // 🍎 TRY SAFE FOOD PATH
+    if (foodPath && foodPath.length > 1) {
+        let next = foodPath[1];
 
-    for (let m of moves) {
-        let next = {x: head.x + m.x, y: head.y + m.y};
+        let sim = [next, ...snake];
+        sim.pop();
 
-        if (isCollision(next, snake)) continue;
-
-        let sim = [next, ...snake.slice(0, -1)];
-
-        let dist = getClosestFoodDist(next);
-
-        // 🔥 survival check
-        let safe = canReachTail(next, sim);
-
-        let reversePenalty =
-            (m.x === -lastMove.x && m.y === -lastMove.y) ? -5 : 0;
-
-        let momentum =
-            (m.x === lastMove.x && m.y === lastMove.y) ? 2 : 0;
-
-        let noise = Math.random() * 3;
-
-        let score =
-            -dist * 10 +          // aggressive food chasing
-            (safe ? 0 : -80) +   // punish traps
-            momentum +
-            reversePenalty +
-            noise;
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMoves = [m];
-        } else if (score === bestScore) {
-            bestMoves.push(m);
+        if (canReachTail(next, sim) || stepsSinceFood > 40) {
+            move(next);
+            return;
         }
     }
 
-    if (bestMoves.length === 0) {
-        resetGame();
+    // 🔁 FOLLOW TAIL
+    let tailPath = pathToTail(head, snake);
+
+    if (tailPath && tailPath.length > 1) {
+        move(tailPath[1]);
         return;
     }
 
-    let chosen = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    let nextMove = {x: head.x + chosen.x, y: head.y + chosen.y};
+    // ⚠️ FALLBACK (random safe)
+    let neighbors = getNeighbors(head).filter(n => !isCollision(n, snake));
 
-    lastMove = chosen;
+    if (neighbors.length > 0) {
+        move(neighbors[Math.floor(Math.random() * neighbors.length)]);
+    } else {
+        resetGame();
+    }
+}
+
+function move(nextMove) {
+    lastMove = {
+        x: nextMove.x - snake[0].x,
+        y: nextMove.y - snake[0].y
+    };
+
     snake.unshift(nextMove);
 
     let ate = false;
