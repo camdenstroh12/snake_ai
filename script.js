@@ -10,7 +10,7 @@ let history = [];
 let lastMove = {x: 1, y: 0};
 
 const FOOD_COUNT = 25;
-let stepsSinceFood = 0; // ✅ NEW (loop breaker)
+let stepsSinceFood = 0;
 
 // === FOOD ===
 function spawnFood() {
@@ -62,6 +62,42 @@ function isCollision(pos, body) {
     return body.some(s => s.x === pos.x && s.y === pos.y);
 }
 
+// === BFS PATH TO FOOD (KEY ADDITION) ===
+function findPathToFood(start, body) {
+    let queue = [[start]];
+    let visited = new Set([start.x + "," + start.y]);
+
+    while (queue.length) {
+        let path = queue.shift();
+        let current = path[path.length - 1];
+
+        // check if food
+        if (foods.some(f => f.x === current.x && f.y === current.y)) {
+            return path;
+        }
+
+        let dirs = [
+            {x:1,y:0},
+            {x:-1,y:0},
+            {x:0,y:1},
+            {x:0,y:-1}
+        ];
+
+        for (let d of dirs) {
+            let next = {x: current.x + d.x, y: current.y + d.y};
+            let key = next.x + "," + next.y;
+
+            if (visited.has(key)) continue;
+            if (isCollision(next, body.slice(0, -1))) continue;
+
+            visited.add(key);
+            queue.push([...path, next]);
+        }
+    }
+
+    return null;
+}
+
 // === SPACE CHECK ===
 function getAvailableSpace(start, body) {
     let visited = new Set();
@@ -90,68 +126,41 @@ function getAvailableSpace(start, body) {
     return visited.size;
 }
 
-// === SAFETY ===
-function canReachTail(head, body) {
-    let tail = body[body.length - 1];
-    let visited = new Set();
-    let queue = [head];
-
-    while (queue.length) {
-        let p = queue.shift();
-        let key = p.x + "," + p.y;
-
-        if (visited.has(key)) continue;
-        visited.add(key);
-
-        if (p.x === tail.x && p.y === tail.y) return true;
-
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-
-        for (let [dx,dy] of dirs) {
-            let nx = p.x + dx;
-            let ny = p.y + dy;
-
-            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
-
-            if (body.slice(0, -1).some(s => s.x === nx && s.y === ny)) continue;
-
-            queue.push({x:nx,y:ny});
-        }
-    }
-
-    return false;
-}
-
-// === LOOKAHEAD ===
-function simulateFuture(head, body, depth) {
-    if (depth === 0) return 0;
-
-    let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    let best = -Infinity;
-
-    for (let [dx,dy] of dirs) {
-        let next = {x: head.x + dx, y: head.y + dy};
-
-        if (isCollision(next, body)) continue;
-
-        let simBody = [next, ...body.slice(0, -1)];
-
-        let food = getClosestFood(next);
-        let dist = Math.abs(next.x - food.x) + Math.abs(next.y - food.y);
-
-        let score = -dist;
-        score += simulateFuture(next, simBody, depth - 1) * 0.7;
-
-        if (score > best) best = score;
-    }
-
-    return best === -Infinity ? -1000 : best;
-}
-
 // === UPDATE ===
 function update() {
     let head = snake[0];
 
+    // 🔥 LOOP BREAK MODE: force path to food
+    if (stepsSinceFood > 60) {
+        let path = findPathToFood(head, snake);
+        if (path && path.length > 1) {
+            let nextMove = path[1];
+
+            snake.unshift(nextMove);
+            lastMove = {x: nextMove.x - head.x, y: nextMove.y - head.y};
+
+            let ate = false;
+            for (let i = 0; i < foods.length; i++) {
+                if (nextMove.x === foods[i].x && nextMove.y === foods[i].y) {
+                    foods.splice(i, 1);
+                    ate = true;
+                    break;
+                }
+            }
+
+            if (ate) {
+                foods.push(spawnFood());
+                stepsSinceFood = 0;
+            } else {
+                snake.pop();
+                stepsSinceFood++;
+            }
+
+            return;
+        }
+    }
+
+    // === NORMAL AI (your improved version) ===
     const moves = [
         {x:1,y:0},
         {x:-1,y:0},
@@ -175,41 +184,15 @@ function update() {
         let space = getAvailableSpace(next, sim);
         let normalizedSpace = space / (gridSize * gridSize);
 
-        let key = next.x + "," + next.y;
-        let freq = history.filter(h => h === key).length;
-        let loopPenalty = -freq * 40;
-
-        let reversePenalty =
-            (m.x === -lastMove.x && m.y === -lastMove.y) ? -150 : 0;
-
-        let momentumBonus =
-            (m.x === lastMove.x && m.y === lastMove.y) ? 20 : 0;
-
-        let futureScore = simulateFuture(next, sim, 2);
-
-        let safe = canReachTail(next, sim) ? 50 : -200;
-
         let edgePenalty =
             (next.x === 0 || next.y === 0 || next.x === gridSize-1 || next.y === gridSize-1)
             ? -25 : 0;
 
-        let noise = Math.random() * 10;
-
-        // 🔥 LOOP BREAKER LOGIC
-        let hungerBoost = Math.min(stepsSinceFood * 0.5, 50);
-        let explorationBoost = stepsSinceFood > 40 ? 80 : 0;
-
         let score =
-            -(dist - hungerBoost) * 3 +
-            normalizedSpace * 70 +
-            futureScore * 1.2 +
-            safe * 0.5 +
-            momentumBonus +
-            loopPenalty +
-            reversePenalty +
+            -dist * 3 +
+            normalizedSpace * 80 +
             edgePenalty +
-            explorationBoost +
-            noise;
+            Math.random() * 10;
 
         if (score > bestScore) {
             bestScore = score;
@@ -230,18 +213,9 @@ function update() {
     lastMove = chosen;
     snake.unshift(nextMove);
 
-    history.push(nextMove.x + "," + nextMove.y);
-    if (history.length > 50) history.shift();
-
-    if (isCollision(snake[0], snake.slice(1))) {
-        resetGame();
-        return;
-    }
-
     let ate = false;
-
     for (let i = 0; i < foods.length; i++) {
-        if (snake[0].x === foods[i].x && snake[0].y === foods[i].y) {
+        if (nextMove.x === foods[i].x && nextMove.y === foods[i].y) {
             foods.splice(i, 1);
             ate = true;
             break;
@@ -250,7 +224,7 @@ function update() {
 
     if (ate) {
         foods.push(spawnFood());
-        stepsSinceFood = 0; // ✅ reset hunger
+        stepsSinceFood = 0;
     } else {
         snake.pop();
         stepsSinceFood++;
