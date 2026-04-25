@@ -187,10 +187,46 @@ function drawCell(x,y,color){
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
+    // === DRAW FOOD ===
     foods.forEach(f => drawCell(f.x, f.y, "lime"));
-    snake.forEach(s => drawCell(s.x, s.y, "white"));
 
-    // 🟩 SCORE UI
+    // === DRAW SNAKE ===
+    snake.forEach((s, i) => {
+
+        // 🟡 HEAD
+        if (// eyes
+ctx.fillStyle = "black";
+ctx.fillRect(s.x * cellSize + cellSize*0.2, s.y * cellSize + cellSize*0.2, 4, 4);
+ctx.fillRect(s.x * cellSize + cellSize*0.6, s.y * cellSize + cellSize*0.2, 4, 4);) {
+            ctx.fillStyle = "#FFD700"; // gold/yellow head
+        } 
+        // 🟢 BODY (gradient effect)
+        else {
+            let t = i / snake.length; // 0 → 1 along body
+            let shade = Math.floor(200 - t * 120); // darker toward tail
+            ctx.fillStyle = `rgb(0, ${shade}, 0)`;
+        }
+
+        // draw segment
+        ctx.fillRect(
+            s.x * cellSize,
+            s.y * cellSize,
+            cellSize,
+            cellSize
+        );
+
+        // 🔲 optional outline for clarity
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+            s.x * cellSize,
+            s.y * cellSize,
+            cellSize,
+            cellSize
+        );
+    });
+
+    // === SCORE UI ===
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, 180, 60);
 
