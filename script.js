@@ -10,7 +10,6 @@ let lastMove = {x: 1, y: 0};
 
 const FOOD_COUNT = 25;
 
-// ⏱ 2-second starvation timer (~33ms loop)
 let stepsSinceFood = 0;
 const STARVE_LIMIT = 60;
 
@@ -58,11 +57,43 @@ function getClosestFoodDist(pos) {
     return best;
 }
 
+// 🔥 CAN REACH TAIL CHECK
+function canReachTail(head, body) {
+    let tail = body[body.length - 1];
+    let visited = new Set();
+    let queue = [head];
+
+    while (queue.length) {
+        let p = queue.shift();
+        let key = p.x + "," + p.y;
+
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        if (p.x === tail.x && p.y === tail.y) return true;
+
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+        for (let [dx,dy] of dirs) {
+            let nx = p.x + dx;
+            let ny = p.y + dy;
+
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) continue;
+
+            // allow tail (it moves)
+            if (body.slice(0, -1).some(s => s.x === nx && s.y === ny)) continue;
+
+            queue.push({x:nx,y:ny});
+        }
+    }
+
+    return false;
+}
+
 // === UPDATE ===
 function update() {
     let head = snake[0];
 
-    // ⏱ STARVATION CHECK
     if (stepsSinceFood > STARVE_LIMIT) {
         resetGame();
         return;
@@ -83,9 +114,13 @@ function update() {
 
         if (isCollision(next, snake)) continue;
 
+        let sim = [next, ...snake.slice(0, -1)];
+
         let dist = getClosestFoodDist(next);
 
-        // 🚀 AGGRESSIVE SCORING
+        // 🔥 survival check
+        let safe = canReachTail(next, sim);
+
         let reversePenalty =
             (m.x === -lastMove.x && m.y === -lastMove.y) ? -5 : 0;
 
@@ -95,7 +130,8 @@ function update() {
         let noise = Math.random() * 3;
 
         let score =
-            -dist * 10 +     // 🔥 VERY strong food priority
+            -dist * 10 +          // aggressive food chasing
+            (safe ? 0 : -80) +   // punish traps
             momentum +
             reversePenalty +
             noise;
